@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class collision : MonoBehaviour
 {
-     public List<GameObject> selection = new List<GameObject>();
+    public List<GameObject> selection = new List<GameObject>();
     void OnCollisionEnter(Collision col)
     {
         // When target is hit      
