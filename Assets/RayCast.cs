@@ -88,7 +88,7 @@ public class RayCast : MonoBehaviour
                     GameObject copy = Instantiate(item);
                     Destroy(copy.GetComponent<Rigidbody>());
                     copy.transform.localScale = new Vector3(0.1f, 0.1f, 0.1f);
-                    copy.transform.position = new Vector3(transform.position.x + copy.transform.position.x*0.1f, transform.position.y,
+                    copy.transform.position = new Vector3(Camera.main.transform.position.x + copy.transform.position.x*0.1f, transform.position.y,
                         Camera.main.transform.position.z + copy.transform.position.z * 0.1f + 0.2f);
                     snowglobe_objs.Add(copy);
                 }

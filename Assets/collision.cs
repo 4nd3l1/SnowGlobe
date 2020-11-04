@@ -14,5 +14,14 @@ public class collision : MonoBehaviour
         }
     }
 
-
+    void OnCollisionExit(Collision col)
+    {
+        if (col.gameObject.tag == "Selectable")
+        {
+            foreach (var item in selection)
+            {
+                selection.Remove(item);
+            }
+        }
+    }
 }
