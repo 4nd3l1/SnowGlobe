@@ -17,7 +17,6 @@ public class collision : MonoBehaviour
             InputDevices.GetDevicesWithCharacteristics(ControllerCharacteristics, devices_right);
             InputDevice rightController = devices_right[0];
             rightController.SendHapticImpulse(0, 1, 0.1f);
-            
         }
     }
 
@@ -25,10 +24,7 @@ public class collision : MonoBehaviour
     {
         if (col.gameObject.tag == "Selectable")
         {
-            foreach (var item in selection)
-            { 
-                selection.Remove(item);
-            }
+            selection.Remove(col.gameObject);
         }
     }
 }

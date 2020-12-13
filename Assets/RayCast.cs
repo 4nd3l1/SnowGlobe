@@ -9,17 +9,19 @@ using UnityEngine.XR.Interaction.Toolkit;
 public class RayCast : MonoBehaviour
 {
     public LineRenderer line;
-    public GameObject sphere; 
+    public GameObject sphere;
     public GameObject snowglobe_prefab;
     public GameObject leftController_GO;
     private InputDevice rightController;
     private InputDevice leftController;
     private GameObject sphere_rendered;
+    private GameObject collider_visual;
     private float distance = 0;
     private float x_trans = 0;
-    private List <GameObject> snowglobe_objs = new List<GameObject>(); 
+    private List<GameObject> snowglobe_objs = new List<GameObject>();
     private List<GameObject> snowglobe_orig = new List<GameObject>();
 
+    bool interacting = false;
 
     private GameObject snowGlobe;
 
@@ -27,8 +29,15 @@ public class RayCast : MonoBehaviour
     private bool last_A = false;
 
     public bool right_trigger_selecting = false;
-    
+
     private float sc = 1.0f;
+
+    private Vector3 dist;
+    private bool calc_distance = true;
+
+    private int rotation_mode = 1;
+
+    private bool joystick_pressed = false;
 
 
     public class SnowGlobe_Tuple
@@ -56,35 +65,32 @@ public class RayCast : MonoBehaviour
         //Instantiate the snow globe
         snowGlobe = Instantiate(snowglobe_prefab);
         snowGlobe.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
+
+        //Instantitate Collider Representation
+
     }
 
     // Update is called once per frame
     void Update()
     {
         // snow globe sphere //////////////////////////////////////
-
         Vector3 last_pos = snowGlobe.transform.position;
         snowGlobe.transform.position = new Vector3(leftController_GO.transform.position.x,
             leftController_GO.transform.position.y + 0.2f, leftController_GO.transform.position.z);
         Vector3 mov = last_pos - snowGlobe.transform.position;
 
-        /*
-        foreach (var item in snowglobe_objs)
-        {
-            item.transform.position = item.transform.position - mov;
-        }
-        */
-        
         rightController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool grip_right);
         rightController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out bool trigger_right);
         leftController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out bool trigger_left);
 
-        if (grip_right)         
+
+        if (grip_right) //Selection mode
         {
+            //Show the bubble and ray
             sphere_rendered.SetActive(true);
             line.enabled = true;
 
-            // Raycast drawing //////////////////////////////////////
+            // Bubble movement along z //////////////////////////////////////
             rightController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_right);
             distance += joystick_right.y * 0.1f;
             if (distance < 0)
@@ -96,6 +102,7 @@ public class RayCast : MonoBehaviour
                 distance = 1000;
             }
 
+            // Bubble scaling //////////////////////////////////////
             sphere_rendered.transform.position = transform.position + transform.TransformDirection(Vector3.forward) * distance;
             leftController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_left);
             if (joystick_left.y > 0)
@@ -111,24 +118,30 @@ public class RayCast : MonoBehaviour
 
             }
 
-
+            //Ray drawing
             line.SetPosition(0, transform.position);
             line.SetPosition(1, transform.TransformDirection(Vector3.forward) * 1000);
             line.enabled = true;
 
             // Raycast selection //////////////////////////////////////
-
             leftController.TryGetFeatureValue(CommonUsages.primaryButton, out bool button_X);
             leftController.TryGetFeatureValue(CommonUsages.secondaryButton, out bool button_Y);
 
-
             collision col_script = (GameObject.FindGameObjectsWithTag("Sphere")[0]).GetComponent<collision>();
+
             List<GameObject> selection = col_script.selection;
 
+            // Solving the on-click problem
+            if (interacting)
+            {
+                interacting = false;
+                col_script.selection.Clear();
+            }
 
+            // what happens upon copy instruction (X button)
             if (button_X)
             {
-                sc = 1;
+                //clean previous selection
                 foreach (var item in snowglobe_objs)
                 {
                     GameObject.Destroy(item);
@@ -136,6 +149,8 @@ public class RayCast : MonoBehaviour
                 snowglobe_objs.Clear();
                 snowglobe_orig.Clear();
                 selection = col_script.selection;
+
+                //create the replics
                 foreach (var item in selection)
                 {
                     if (!snowglobe_objs.Contains(item))
@@ -143,7 +158,6 @@ public class RayCast : MonoBehaviour
                         float radius = sphere_rendered.transform.localScale.x * sphere_rendered.GetComponent<SphereCollider>().radius;
                         float scaler = 0.3f / (sphere_rendered.transform.localScale.x);
                         GameObject copy = Instantiate(item);
-                        Debug.Log(copy);
                         Destroy(copy.GetComponent<Rigidbody>());
                         copy.transform.localScale = new Vector3(scaler, scaler, scaler);
                         float x = snowGlobe.transform.position.x + scaler * (copy.transform.position.x - sphere_rendered.transform.position.x);
@@ -151,18 +165,19 @@ public class RayCast : MonoBehaviour
                         float z = snowGlobe.transform.position.z + scaler * (copy.transform.position.z - sphere_rendered.transform.position.z);
                         copy.transform.position = new Vector3(x, y, z);
                         copy.transform.parent = snowGlobe.transform;
-                        copy.AddComponent<MaskedObject>();
                         snowglobe_objs.Add(copy);
                         snowglobe_orig.Add(item);
                     }
 
                 }
-            } 
+            }
         }
 
         else
         {
-            //Grap an object inside the snow globe
+            interacting = true;
+
+            //Scaling the snowglobe
             leftController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_left);
             if (joystick_left.y > 0 & snowGlobe.transform.localScale.x < 0.8f)
             {
@@ -174,10 +189,10 @@ public class RayCast : MonoBehaviour
 
             }
 
-            if (trigger_right & !trigger_left)
+            if (trigger_right & !trigger_left) // grab an object from the snow globe
             {
                 collision_rightC col_script_right = this.GetComponent<collision_rightC>();
-                if(col_script_right.selection != null)
+                if (col_script_right.selection != null)
                 {
                     right_trigger_selecting = true;
                 }
@@ -186,52 +201,72 @@ public class RayCast : MonoBehaviour
                     //make the original object suffer the same transformations as the one inside the snow globe
                     if (snowglobe_objs[i].Equals(col_script_right.selection))
                     {
-                        Vector3 difference = transform.position - snowglobe_objs[i].transform.position;
+                        // maintaining the smae distance between object and controller
+                        if (calc_distance)
+                        {
+                            dist = snowglobe_objs[i].transform.position - transform.position;
+                            calc_distance = false;
+                        }
+
+                        //Change original and copy positions in relation to the sphere center
+                        Vector3 difference = transform.position - (snowglobe_objs[i].transform.position - dist);
                         difference /= 0.3f / (sphere_rendered.transform.localScale.x);
-                        snowglobe_objs[i].transform.position = transform.position;
+
+                        snowglobe_objs[i].transform.position = transform.position + dist;
+
+                        // Grabbed object rotation XYZ
                         rightController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_right);
-                        snowglobe_objs[i].transform.rotation = snowglobe_objs[i].transform.rotation * Quaternion.Euler(0, -joystick_right.x, 0);
-                        snowglobe_orig[i].transform.rotation = snowglobe_orig[i].transform.rotation * Quaternion.Euler(0, -joystick_right.x, 0);
-                        snowglobe_orig[i].transform.position += Quaternion.Inverse(snowGlobe.transform.rotation) * difference; 
+
+                        rightController.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out bool joystick_right_click);
+                        if (joystick_right_click)
+                        {
+                            if (joystick_pressed == false)
+                            {
+                                rotation_mode++;
+                                if (rotation_mode > 3)
+                                {
+                                    rotation_mode = 1;
+                                }
+                                joystick_pressed = true;
+                            }
+
+                        }
+                        else
+                        {
+                            joystick_pressed = false;
+                        }
+
+                        if (rotation_mode == 2)
+                        {
+                            snowglobe_objs[i].transform.rotation = snowglobe_objs[i].transform.rotation * Quaternion.Euler(0, -joystick_right.y, 0);
+                            snowglobe_orig[i].transform.rotation = snowglobe_orig[i].transform.rotation * Quaternion.Euler(0, -joystick_right.y, 0);
+                        }
+                        else if (rotation_mode == 1)
+                        {
+                            snowglobe_objs[i].transform.rotation = snowglobe_objs[i].transform.rotation * Quaternion.Euler(-joystick_right.y, 0, 0);
+                            snowglobe_orig[i].transform.rotation = snowglobe_orig[i].transform.rotation * Quaternion.Euler(-joystick_right.y, 0, 0);
+                        }
+                        else
+                        {
+                            snowglobe_objs[i].transform.rotation = snowglobe_objs[i].transform.rotation * Quaternion.Euler(0, 0, -joystick_right.y);
+                            snowglobe_orig[i].transform.rotation = snowglobe_orig[i].transform.rotation * Quaternion.Euler(0, 0, -joystick_right.y);
+                        }
+
+                        // Join translation and rotation into a singular transform
+                        snowglobe_orig[i].transform.position += Quaternion.Inverse(snowGlobe.transform.rotation) * difference;
                     }
                 }
 
             }
             else
             {
+                //Rotate the snow globe
+                calc_distance = true;
                 rightController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_right);
                 snowGlobe.transform.rotation = snowGlobe.transform.rotation * Quaternion.Euler(0, -joystick_right.x, 0);
                 right_trigger_selecting = false;
             }
 
-          /*   
-           leftController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_left);
-            float sens = 0.005f; 
-            
-            // Scale the snow globe - Main Problem: Release
-            if (joystick_left.y > 0 & snowGlobe.transform.localScale.magnitude < 1)
-            {
-                foreach (var item in snowglobe_objs)
-                {
-                    item.transform.localScale += new Vector3(sens, sens, sens);
-                    item.transform.position = snowGlobe.transform.position + (item.transform.position - snowGlobe.transform.position) * sens;
-                }
-                snowGlobe.transform.localScale += new Vector3(sens, sens, sens);
-            }
-            else if (joystick_left.y < 0 & snowGlobe.transform.localScale.magnitude > 0.1)
-            {
-                foreach (var item in snowglobe_objs)
-                {
-                    if((item.transform.localScale.magnitude - sens) > 0)
-                    {
-                        item.transform.localScale -= new Vector3(sens, sens, sens);
-                        item.transform.position = snowGlobe.transform.position + (item.transform.position - snowGlobe.transform.position) * sens;
-                    }
-                }
-                snowGlobe.transform.localScale -= new Vector3(sens, sens, sens);
-                
-            }
-       */
             sphere_rendered.SetActive(false);
             line.enabled = false;
         }
@@ -239,5 +274,5 @@ public class RayCast : MonoBehaviour
 
     }
 
-   
+
 }
