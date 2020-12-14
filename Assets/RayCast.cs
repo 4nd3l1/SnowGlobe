@@ -5,12 +5,14 @@ using System.Diagnostics.Contracts;
 using UnityEngine;
 using UnityEngine.XR;
 using UnityEngine.XR.Interaction.Toolkit;
+using static UnityEditor.BaseShaderGUI;
 
 public class RayCast : MonoBehaviour
 {
     public LineRenderer line;
     public GameObject sphere;
     public GameObject snowglobe_prefab;
+    public GameObject colliderVis_prefab;
     public GameObject leftController_GO;
     private InputDevice rightController;
     private InputDevice leftController;
@@ -67,21 +69,30 @@ public class RayCast : MonoBehaviour
         snowGlobe.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
 
         //Instantitate Collider Representation
+        collider_visual = Instantiate(colliderVis_prefab, transform);
+        collider_visual.transform.position = new Vector3(transform.position.x  - 0.008f, transform.position.y - 0.0024f, transform.position.z + 0.0304f);
+        collider_visual.SetActive(true);
 
     }
 
     // Update is called once per frame
     void Update()
     {
-        // snow globe sphere //////////////////////////////////////
-        Vector3 last_pos = snowGlobe.transform.position;
-        snowGlobe.transform.position = new Vector3(leftController_GO.transform.position.x,
-            leftController_GO.transform.position.y + 0.2f, leftController_GO.transform.position.z);
-        Vector3 mov = last_pos - snowGlobe.transform.position;
-
         rightController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.gripButton, out bool grip_right);
         rightController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out bool trigger_right);
         leftController.TryGetFeatureValue(UnityEngine.XR.CommonUsages.triggerButton, out bool trigger_left);
+
+        // snow globe sphere //////////////////////////////////////
+        Vector3 last_pos = snowGlobe.transform.position;
+        if (!trigger_right)
+        {
+           snowGlobe.transform.position = new Vector3(leftController_GO.transform.position.x,
+            leftController_GO.transform.position.y + 0.2f, leftController_GO.transform.position.z);
+        }
+        
+        Vector3 mov = last_pos - snowGlobe.transform.position;
+
+        
 
 
         if (grip_right) //Selection mode
@@ -159,6 +170,8 @@ public class RayCast : MonoBehaviour
                         float scaler = 0.3f / (sphere_rendered.transform.localScale.x);
                         GameObject copy = Instantiate(item);
                         Destroy(copy.GetComponent<Rigidbody>());
+                        Destroy(copy.GetComponent<BoxCollider>());
+                        MeshCollider mc = copy.AddComponent<MeshCollider>();
                         copy.transform.localScale = new Vector3(scaler, scaler, scaler);
                         float x = snowGlobe.transform.position.x + scaler * (copy.transform.position.x - sphere_rendered.transform.position.x);
                         float y = snowGlobe.transform.position.y + scaler * (copy.transform.position.y - sphere_rendered.transform.position.y);
@@ -191,7 +204,33 @@ public class RayCast : MonoBehaviour
 
             if (trigger_right & !trigger_left) // grab an object from the snow globe
             {
-                collision_rightC col_script_right = this.GetComponent<collision_rightC>();
+                //Change the color of the collider representation to be related to the current rotation axis
+                switch (rotation_mode)
+                {
+                    case 1:
+                        {
+                            collider_visual.GetComponent<Renderer>().material.SetColor("_BaseColor", Color.red);
+                            break;
+                        }
+
+
+                    case 2:
+                        {
+                            collider_visual.GetComponent<Renderer>().material.SetColor("_BaseColor", Color.green);
+                            break;
+                        }
+                        
+
+                    case 3:
+                        {
+                            collider_visual.GetComponent<Renderer>().material.SetColor("_BaseColor", Color.blue);
+                            break;
+                        }
+                        
+
+                }
+
+                collision_rightC col_script_right = collider_visual.GetComponent<collision_rightC>();
                 if (col_script_right.selection != null)
                 {
                     right_trigger_selecting = true;
@@ -201,7 +240,7 @@ public class RayCast : MonoBehaviour
                     //make the original object suffer the same transformations as the one inside the snow globe
                     if (snowglobe_objs[i].Equals(col_script_right.selection))
                     {
-                        // maintaining the smae distance between object and controller
+                        // maintaining the same distance between object and controller
                         if (calc_distance)
                         {
                             dist = snowglobe_objs[i].transform.position - transform.position;
@@ -261,6 +300,7 @@ public class RayCast : MonoBehaviour
             else
             {
                 //Rotate the snow globe
+
                 calc_distance = true;
                 rightController.TryGetFeatureValue(CommonUsages.primary2DAxis, out Vector2 joystick_right);
                 snowGlobe.transform.rotation = snowGlobe.transform.rotation * Quaternion.Euler(0, -joystick_right.x, 0);
