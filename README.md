@@ -10,6 +10,11 @@ This way an user can perform visual manipulation (Rotating and scaling the snow 
 Every object manipulation that is performed is also reflected on the original object as well.
 This way, a user can manipulate objects without the need to physically interact with the world.
 
+## Main utilities
+   - Oculus Quest 2
+   - Unity 
+   - Unity XR plugin
+
 ## Development team
   - Daniel Gonçalves
   - Henrique Gaspar
